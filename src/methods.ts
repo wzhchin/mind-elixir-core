@@ -15,6 +15,7 @@ import * as nodeOperation from './nodeOperation'
 import * as arrow from './arrow'
 import * as summary from './summary'
 import * as exportImage from './plugin/exportImage'
+import imageControls from './plugin/imageControls'
 
 export type OperationMap = typeof nodeOperation
 export type Operations = keyof OperationMap
@@ -94,6 +95,7 @@ const methods = {
         this.disposable.push(contextMenu(this, this.contextMenu))
       }
       this.allowUndo && this.disposable.push(operationHistory(this))
+      this.disposable.push(imageControls(this))
     }
     this.layout()
     this.linkDiv()

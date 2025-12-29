@@ -1,6 +1,5 @@
 import { fileURLToPath } from 'url'
 import { build } from 'vite'
-import strip from '@rollup/plugin-strip'
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url))
 const buildList = [
@@ -45,9 +44,6 @@ for (let i = 0; i < buildList.length; i++) {
       },
       rollupOptions: {
         plugins: [
-          strip({
-            include: ['**/*.ts', '**/*.js'],
-          }),
         ],
       },
     },
