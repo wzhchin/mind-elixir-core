@@ -7,6 +7,7 @@ export interface ImageControlsOptions {
   enableSizeControls?: boolean
   enableStyleControl?: boolean
   enableFullscreen?: boolean
+  enableColorControl?: boolean
 }
 
 export class ImageControls {
@@ -28,9 +29,12 @@ export class ImageControls {
     container.className = 'image-controls'
     container.innerHTML = `
     <div class="controls-content">
+        <div class="controls-row image-controls-row">
         ${this.options.enableSizeControls ? this.createSizeControls() : ''}
         ${this.options.enableStyleControl ? this.createStyleControl() : ''}
         ${this.options.enableFullscreen ? this.createOtherButton() : ''}
+        </div>
+        ${this.options.enableColorControl || this.options.enableFullscreen ? this.createColorControl() : ''}
         </div>
     `
     return container
@@ -71,9 +75,21 @@ export class ImageControls {
       </button>
       <button class="remove-btn" title="remove-image">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/>
+        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
       </svg>
       </button>
+    </div>
+    `
+  }
+
+  private createColorControl(): string {
+    return `
+    <div class="color-control">
+      <button class="color-btn red-btn" data-color="red" title="红色"></button>
+      <button class="color-btn green-btn" data-color="green" title="绿色"></button>
+      <button class="color-btn blue-btn" data-color="blue" title="蓝色"></button>
+      <button class="color-btn yellow-btn" data-color="yellow" title="黄色"></button>
+      <button class="color-btn clear-btn" data-color="clear" title="清除颜色"></button>
     </div>
     `
   }
@@ -87,6 +103,9 @@ export class ImageControls {
     }
     if (this.options.enableFullscreen) {
       this.setupOtherControl()
+    }
+    if (this.options.enableColorControl || this.options.enableFullscreen) {
+      this.setupColorControl()
     }
   }
 
@@ -160,12 +179,44 @@ export class ImageControls {
       }
     })
 
-    const removeBtn = this.container.querySelector('.fullscreen-btn') as HTMLButtonElement
+    const removeBtn = this.container.querySelector('.remove-btn') as HTMLButtonElement
 
-    fullscreenBtn?.addEventListener('click', () => {
+    removeBtn?.addEventListener('click', () => {
       if (this.currentNodeObj?.image) {
-        this.showFullscreen(this.currentNodeObj.image.url)
+        this.mind.reshapeNode(this.currentTopic!, {
+          image: undefined,
+        })
+        this.hide()
       }
+    })
+  }
+
+  private setupColorControl(): void {
+    const colorButtons = this.container.querySelectorAll('.color-btn') as NodeListOf<HTMLButtonElement>
+
+    colorButtons.forEach(btn => {
+      btn?.addEventListener('click', () => {
+        const color = btn.dataset.color
+        if (!color) return
+
+        const currentStyle = this.currentNodeObj?.style || {}
+
+        const colorMap: Record<string, string> = {
+          red: '#ffcccc',
+          green: '#ccffcc',
+          blue: '#ccccff',
+          yellow: '#ffffcc',
+          clear: '#00000000',
+        }
+
+        this.mind.reshapeNode(this.currentTopic!, {
+          style: {
+            ...currentStyle,
+            background: colorMap[color] || undefined,
+          },
+        })
+        this.hide()
+      })
     })
   }
 
@@ -202,12 +253,19 @@ export class ImageControls {
   }
 
   show(topic: Topic, nodeObj: NodeObj): void {
-    if (!nodeObj.image) return
+    if (!nodeObj.image && !this.options.enableColorControl) return
 
     this.currentTopic = topic
     this.currentNodeObj = nodeObj
 
-    this.updateControlValues(nodeObj.image)
+    const imageControlsRow = this.container.querySelector('.image-controls-row') as HTMLDivElement
+    if (imageControlsRow) {
+      imageControlsRow.style.display = nodeObj.image ? 'flex' : 'none'
+    }
+
+    if (nodeObj.image) {
+      this.updateControlValues(nodeObj.image)
+    }
 
     this.positionControls(topic)
 
@@ -234,10 +292,12 @@ export class ImageControls {
   private positionControls(topic: Topic): void {
     const rect = topic.getBoundingClientRect()
     const containerRect = this.mind.container.getBoundingClientRect()
+    const hasImage = !!this.currentNodeObj?.image
 
     this.container.style.position = 'absolute'
     this.container.style.zIndex = '1000'
-    this.container.style.top = `${Math.max(rect.top - containerRect.top - 45, 5)}px`
+    const topOffset = hasImage ? 45 : 25
+    this.container.style.top = `${Math.max(rect.top - containerRect.top - topOffset, 5)}px`
     this.container.style.left = `${Math.max(rect.left - containerRect.left - 5, 5)}px`
   }
 
@@ -260,16 +320,18 @@ export interface ImageControlsPluginOptions {
   enableSizeControls?: boolean
   enableStyleControl?: boolean
   enableFullscreen?: boolean
+  enableColorControl?: boolean
   triggerOn?: 'click' | 'hover' | 'doubleclick'
 }
 
 export default function (mind: MindElixirInstance, options: ImageControlsPluginOptions = {}) {
-  const { enableSizeControls = true, enableStyleControl = true, enableFullscreen = true, triggerOn = 'click' } = options
+  const { enableSizeControls = true, enableStyleControl = true, enableFullscreen = true, enableColorControl = true, triggerOn = 'click' } = options
 
   const imageControls = new ImageControls(mind, {
     enableSizeControls,
     enableStyleControl,
     enableFullscreen,
+    enableColorControl,
   })
 
   mind.container.appendChild(imageControls.getContainer())
@@ -279,7 +341,7 @@ export default function (mind: MindElixirInstance, options: ImageControlsPluginO
   }
 
   const showControls = (topic: Topic) => {
-    if (topic.nodeObj?.image) {
+    if (topic.nodeObj?.image || enableColorControl) {
       imageControls.show(topic, topic.nodeObj)
     }
   }
@@ -303,7 +365,7 @@ export default function (mind: MindElixirInstance, options: ImageControlsPluginO
 
   const handleClick = (e: MouseEvent) => {
     const target = e.target as HTMLElement
-    if (isTopic(target) && target.nodeObj?.image) {
+    if (isTopic(target) && (target.nodeObj?.image || enableColorControl)) {
       showControls(target)
     } else if (!imageControls.getContainer().contains(target)) {
       hideControls()
@@ -312,7 +374,7 @@ export default function (mind: MindElixirInstance, options: ImageControlsPluginO
 
   const handleMouseEnter = (e: MouseEvent) => {
     const target = e.target as HTMLElement
-    if (isTopic(target) && target.nodeObj?.image) {
+    if (isTopic(target) && (target.nodeObj?.image || enableColorControl)) {
       showControls(target)
     }
   }
@@ -330,7 +392,7 @@ export default function (mind: MindElixirInstance, options: ImageControlsPluginO
 
   const handleDoubleClick = (e: MouseEvent) => {
     const target = e.target as HTMLElement
-    if (isTopic(target) && target.nodeObj?.image) {
+    if (isTopic(target) && (target.nodeObj?.image || enableColorControl)) {
       showControls(target)
     }
   }
